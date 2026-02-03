@@ -21,13 +21,13 @@ try:
 except Exception as e:
     print(f"Error listing models: {e}")
 
-print("\n--- Testing Content Generation with 'gemini-2.0-flash-exp' ---")
+print("\n--- Testing Content Generation with 'gemini-3-flash-preview-exp' ---")
 try:
-    model = genai.GenerativeModel('gemini-2.0-flash-exp')
+    model = genai.GenerativeModel('gemini-3-flash-preview-exp')
     response = model.generate_content("Hello, can you hear me?")
     print(f"Response: {response.text}")
 except Exception as e:
-    print(f"Error with gemini-2.0-flash-exp: {e}")
+    print(f"Error with gemini-3-flash-preview-exp: {e}")
 
 print("\n--- Testing Content Generation with 'models/gemini-1.5-flash' ---")
 try:

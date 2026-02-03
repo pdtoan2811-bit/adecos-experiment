@@ -22,10 +22,22 @@ function ChatPage() {
         setHasSearched(messages.length > 0);
     }, [messages]);
 
+    // Listen for follow-up suggestion clicks
+    useEffect(() => {
+        const handleSuggestionClick = (event) => {
+            handleSearch(event.detail);
+        };
+
+        window.addEventListener('agentSuggestionClick', handleSuggestionClick);
+        return () => {
+            window.removeEventListener('agentSuggestionClick', handleSuggestionClick);
+        };
+    }, []);
+
     const handleSearch = async (query) => {
         if (!query) return;
 
-        console.log('[ChatPage] Starting search for:', query);
+        console.log('[ChatPage] Starting AI Agent query:', query);
         setIsSearching(true);
         setHasSearched(true);
 
@@ -40,8 +52,9 @@ function ChatPage() {
         setMessages(prev => [...prev, { role: 'user', type: 'text', content: query }]);
 
         try {
-            console.log('[ChatPage] Sending request to API...');
-            const response = await fetch('http://localhost:8000/api/chat/stream', {
+            console.log('[ChatPage] Sending request to AI Agent API...');
+            // Use new agent endpoint
+            const response = await fetch('http://localhost:8000/api/agent/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ messages: newMessages }),
@@ -80,7 +93,8 @@ function ChatPage() {
                     const aiMessage = {
                         role: 'assistant',
                         type: parsed.type,
-                        content: parsed.content
+                        content: parsed.content,
+                        context: parsed.context || null
                     };
 
                     console.log('[ChatPage] Updating messages with:', aiMessage.type);
@@ -122,7 +136,7 @@ function ChatPage() {
                 return newArr;
             });
         } finally {
-            console.log('[ChatPage] Search complete');
+            console.log('[ChatPage] Query complete');
             setIsSearching(false);
         }
     };
@@ -131,9 +145,9 @@ function ChatPage() {
         <div className="flex flex-col h-full bg-black text-white overflow-hidden">
             {/* Header */}
             <div className="px-8 py-6 border-b border-white/10 flex-shrink-0">
-                <h1 className="text-2xl font-serif tracking-tight">Affiliate Research</h1>
+                <h1 className="text-2xl font-serif tracking-tight">AI Agent</h1>
                 <p className="text-xs text-luxury-gray uppercase tracking-widest mt-1">
-                    Powered by Gemini AI
+                    Phân tích dữ liệu thông minh • Powered by Gemini AI
                 </p>
             </div>
 
@@ -162,3 +176,4 @@ function ChatPage() {
 }
 
 export default ChatPage;
+

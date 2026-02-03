@@ -7,7 +7,7 @@ load_dotenv()
 api_key = os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=api_key)
 
-model_name = "models/gemini-2.0-flash"
+model_name = "models/gemini-3-flash-preview"
 print(f"Testing {model_name}...")
 try:
     model = genai.GenerativeModel(model_name)

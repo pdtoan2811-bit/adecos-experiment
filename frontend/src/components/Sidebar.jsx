@@ -27,8 +27,9 @@ const Sidebar = () => {
     }, []);
 
     const navItems = [
-        { path: '/', label: 'Chat Research', icon: '▣' },
+        { path: '/', label: 'AI Agent', icon: '🤖' },
         { path: '/projects', label: 'Dự án đã lưu', icon: '◫', badge: savedCount },
+        { path: '/ads', label: 'Quản lý Ads', icon: '📢' },
         { path: '/dashboard', label: 'Analytics', icon: '▭' },
         { path: '/settings', label: 'Settings', icon: '⚙' },
     ];
@@ -38,7 +39,7 @@ const Sidebar = () => {
             {/* Logo/Brand */}
             <div className="px-6 py-8 border-b border-white/10">
                 <h1 className="text-2xl font-serif text-white tracking-tight">Adecos</h1>
-                <p className="text-xs text-luxury-gray uppercase tracking-widest mt-1">Affiliate Research</p>
+                <p className="text-xs text-luxury-gray uppercase tracking-widest mt-1">AI-Powered Platform</p>
             </div>
 
             {/* Navigation */}

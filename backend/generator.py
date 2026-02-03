@@ -1,4 +1,5 @@
 import os
+import json
 import google.generativeai as genai
 from dotenv import load_dotenv
 
@@ -62,7 +63,6 @@ async def generate_research_stream(niche: str):
             cleaned_buffer = '\n'.join(lines).strip()
         
         # Check if AI returned the full structured response or just the array
-        import json
         try:
             parsed = json.loads(cleaned_buffer)
             # If it's already structured with "type" and "content", extract content
@@ -84,47 +84,11 @@ async def generate_research_stream(niche: str):
         yield f'{{"type": "table", "content": [{{"error": "Generation failed: {str(e)}"}}]}}'
 
 
-async def classify_intent_ai(user_query: str, conversation_history: str = "") -> str:
-    """AI-based intent classification using Gemini."""
-    import json
-    
-    classifier_prompt = f"""You are an intent classifier for an affiliate marketing research assistant.
-
-Analyze the user's query and classify their intent into ONE of these categories:
-
-1. **research** - User wants to find affiliate programs, search for opportunities, or get program recommendations
-   Examples: "Forex", "crypto programs", "beauty ecommerce", "find finance affiliates", "gaming niche"
-   
-2. **explanation** - User wants to understand, learn about, or get clarification on something
-   Examples: "What is affiliate marketing?", "Why is this score high?", "How does this work?", "Explain row 1", "giải thích"
-   
-3. **followup** - User is asking about a previous response or wants more details on something already discussed
-   Examples: "tell me more", "expand on that", "the first one", "details about that program"
-
-User Query: "{user_query}"
-
-Previous Context: {conversation_history if conversation_history else "None (first message)"}
-
-Respond ONLY with ONE word: research, explanation, or followup
-"""
-    
-    try:
-        response = await model.generate_content_async(classifier_prompt)
-        intent = response.text.strip().lower()
-        
-        # Validate and default to research if invalid
-        if intent not in ['research', 'explanation', 'followup']:
-            return 'research'
-        
-        return intent
-    except Exception as e:
-        # Default to research on error
-        print(f"Intent classification error: {e}")
-        return 'research'
-
-
 async def generate_chat_stream(messages: list):
     """Generate streaming chat response based on conversation history.
+    
+    This is the LEGACY endpoint that routes to the old simple intent system.
+    For the new AI Agent feature, use generate_agent_stream instead.
     
     Args:
         messages: List of message dicts with 'role' and 'content'
@@ -132,8 +96,6 @@ async def generate_chat_stream(messages: list):
     Yields:
         JSON-formatted response chunks
     """
-    import json
-    
     # Get last user message
     user_messages = [m for m in messages if m.get('role') == 'user']
     if not user_messages:
@@ -150,7 +112,7 @@ async def generate_chat_stream(messages: list):
         if isinstance(content, str):
             conversation_history += f"{role}: {content}\n"
     
-    # Classify intent using AI
+    # Classify intent using simple AI
     intent = await classify_intent_ai(user_query, conversation_history)
     
     # Route based on intent
@@ -219,3 +181,77 @@ Provide a helpful explanation in Vietnamese.
         except Exception as e:
             print(f"Error in chat generation: {e}")
             yield json.dumps({"type": "text", "content": f"Xin lỗi, có lỗi xảy ra: {str(e)}"})
+
+
+async def classify_intent_ai(user_query: str, conversation_history: str = "") -> str:
+    """AI-based intent classification using Gemini."""
+    
+    classifier_prompt = f"""You are an intent classifier for an affiliate marketing research assistant.
+
+Analyze the user's query and classify their intent into ONE of these categories:
+
+1. **research** - User wants to find affiliate programs, search for opportunities, or get program recommendations
+   Examples: "Forex", "crypto programs", "beauty ecommerce", "find finance affiliates", "gaming niche"
+   
+2. **explanation** - User wants to understand, learn about, or get clarification on something
+   Examples: "What is affiliate marketing?", "Why is this score high?", "How does this work?", "Explain row 1", "giải thích"
+   
+3. **followup** - User is asking about a previous response or wants more details on something already discussed
+   Examples: "tell me more", "expand on that", "the first one", "details about that program"
+
+User Query: "{user_query}"
+
+Previous Context: {conversation_history if conversation_history else "None (first message)"}
+
+Respond ONLY with ONE word: research, explanation, or followup
+"""
+    
+    try:
+        response = await model.generate_content_async(classifier_prompt)
+        intent = response.text.strip().lower()
+        
+        # Validate and default to research if invalid
+        if intent not in ['research', 'explanation', 'followup']:
+            return 'research'
+        
+        return intent
+    except Exception as e:
+        # Default to research on error
+        print(f"Intent classification error: {e}")
+        return 'research'
+
+
+async def generate_agent_stream(messages: list):
+    """Generate AI Agent response using crewAI workflow.
+    
+    This is the NEW endpoint for the AI Agent feature with:
+    - Multi-agent orchestration
+    - Dynamic chart/table rendering
+    - Narrative introductions
+    - Conversation context
+    
+    Args:
+        messages: List of message dicts with 'role' and 'content'
+    
+    Yields:
+        JSON-formatted response with type (composite, chart, table, text)
+    """
+    try:
+        from agents import run_agent_workflow
+        
+        # Run the agent workflow
+        result = await run_agent_workflow(messages)
+        
+        # Yield the result as JSON
+        yield json.dumps(result, ensure_ascii=False)
+        
+    except Exception as e:
+        print(f"Error in agent workflow: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Fallback to simple text response
+        yield json.dumps({
+            "type": "text",
+            "content": f"Xin lỗi, có lỗi xảy ra trong quá trình xử lý. Vui lòng thử lại.\n\nChi tiết: {str(e)}"
+        }, ensure_ascii=False)

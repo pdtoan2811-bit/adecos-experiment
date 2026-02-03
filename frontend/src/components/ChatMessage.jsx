@@ -2,9 +2,11 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ResultsTable from './ResultsTable';
+import ChartMessage from './agent/ChartMessage';
+import CompositeMessage from './agent/CompositeMessage';
 
 const ChatMessage = ({ message }) => {
-    const { role, type, content } = message;
+    const { role, type, content, context } = message;
     const isUser = role === 'user';
 
     if (type === 'loading') {
@@ -12,8 +14,26 @@ const ChatMessage = ({ message }) => {
             <div className="flex w-full justify-start my-4 px-4 md:px-0 fade-in-up">
                 <div className="bg-white/5 border border-white/10 text-luxury-white/60 px-6 py-4 rounded-3xl rounded-tl-sm backdrop-blur-md text-sm font-light italic tracking-wider animate-pulse flex items-center gap-2">
                     <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce"></div>
-                    Adecos đang suy nghĩ...
+                    Adecos đang phân tích...
                 </div>
+            </div>
+        );
+    }
+
+    // NEW: Handle composite messages (narrative + chart/table)
+    if (type === 'composite') {
+        return (
+            <div className="w-full my-6 fade-in-up">
+                <CompositeMessage content={content} context={context} />
+            </div>
+        );
+    }
+
+    // NEW: Handle chart messages
+    if (type === 'chart') {
+        return (
+            <div className="w-full my-6 fade-in-up">
+                <ChartMessage content={content} />
             </div>
         );
     }
@@ -123,3 +143,4 @@ const ChatMessage = ({ message }) => {
 };
 
 export default ChatMessage;
+

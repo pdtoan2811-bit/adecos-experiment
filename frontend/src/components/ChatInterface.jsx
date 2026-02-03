@@ -7,9 +7,11 @@ const ChatInterface = ({ onSearch, isSearching, hasSearched }) => {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (query.trim()) onSearch(query);
+        setQuery(''); // Clear input after submit
     };
 
-    const suggestions = ['Crypto', 'Software', 'Forex', 'Finance', 'E-commerce'];
+    const suggestions = ['Chi phí tháng này', 'ROAS của tôi', 'Chiến dịch có hiệu suất tốt nhất', 'So sánh với tháng trước'];
+
 
     return (
         <div

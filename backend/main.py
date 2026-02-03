@@ -39,8 +39,9 @@ async def stream_research(request: ResearchRequest):
 @app.post("/api/chat/stream")
 async def stream_chat(request: ChatRequest):
     """
-    Endpoint for conversational interface.
+    LEGACY endpoint for conversational interface.
     Accepts history, routes intent, and streams back 'type: table' or 'type: text'.
+    For the new AI Agent feature, use /api/agent/chat instead.
     """
     from generator import generate_chat_stream
     return StreamingResponse(
@@ -48,6 +49,30 @@ async def stream_chat(request: ChatRequest):
         media_type="application/x-ndjson"
     )
 
+@app.post("/api/agent/chat")
+async def agent_chat(request: ChatRequest):
+    """
+    NEW AI Agent endpoint with crewAI-powered workflow.
+    
+    Features:
+    - Multi-agent orchestration (Router, Analyst, Narrator)
+    - Dynamic chart/table rendering
+    - Narrative introductions before data
+    - Conversation context preservation
+    
+    Returns response types:
+    - composite: narrative + chart/table sections
+    - chart: chart data with config
+    - table: tabular data
+    - text: plain text/markdown
+    """
+    from generator import generate_agent_stream
+    return StreamingResponse(
+        generate_agent_stream(request.messages),
+        media_type="application/x-ndjson"
+    )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
