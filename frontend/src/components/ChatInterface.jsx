@@ -10,7 +10,7 @@ const ChatInterface = ({ onSearch, isSearching, hasSearched }) => {
         setQuery(''); // Clear input after submit
     };
 
-    const suggestions = ['Chi phí tháng này', 'ROAS của tôi', 'Chiến dịch có hiệu suất tốt nhất', 'So sánh với tháng trước'];
+    const suggestions = ['Tối ưu chiến dịch ads', 'Chi phí tháng này', 'ROAS của tôi', 'Chiến dịch có hiệu suất tốt nhất'];
 
 
     return (

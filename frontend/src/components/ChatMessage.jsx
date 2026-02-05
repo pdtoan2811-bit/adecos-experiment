@@ -4,10 +4,38 @@ import remarkGfm from 'remark-gfm';
 import ResultsTable from './ResultsTable';
 import ChartMessage from './agent/ChartMessage';
 import CompositeMessage from './agent/CompositeMessage';
+import CompactWorkflowMessage from './agent/CompactWorkflowMessage';
+import CampaignSelectionTable from './agent/CampaignSelectionTable';
 
-const ChatMessage = ({ message }) => {
+const ChatMessage = ({ message, onSearch }) => {
     const { role, type, content, context } = message;
     const isUser = role === 'user';
+
+    // Handle campaign selection for general queries
+    if (type === 'campaign_selection') {
+        return (
+            <div className="w-full my-4 fade-in-up">
+                <CampaignSelectionTable
+                    campaigns={content.campaigns}
+                    onSelect={(campaign) => {
+                        // Trigger deep dive for the selected campaign
+                        if (onSearch) {
+                            onSearch(`Deep dive analysis for ${campaign.name}`);
+                        }
+                    }}
+                />
+            </div>
+        );
+    }
+
+    // Handle workflow messages with compact SMART layout
+    if (type === 'workflow') {
+        return (
+            <div className="w-full my-4 fade-in-up">
+                <CompactWorkflowMessage content={content} context={context} />
+            </div>
+        );
+    }
 
     if (type === 'loading') {
         return (

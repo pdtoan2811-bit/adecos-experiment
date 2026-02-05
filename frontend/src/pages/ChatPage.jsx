@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { useChatContext } from '../context/ChatContext';
 import ChatInterface from '../components/ChatInterface';
 import ChatMessage from '../components/ChatMessage';
+import { generateMockWorkflow, shouldTriggerWorkflow } from '../data/mockWorkflowData';
 
 function ChatPage() {
     const { messages, setMessages, getHistory } = useChatContext();
@@ -53,6 +54,35 @@ function ChatPage() {
 
         try {
             console.log('[ChatPage] Sending request to AI Agent API...');
+
+            // Check if this query should trigger a workflow response (for testing)
+            if (shouldTriggerWorkflow(query)) {
+                console.log('[ChatPage] Triggering mock workflow for:', query);
+
+                // Add loading state
+                setMessages(prev => [...prev, { role: 'assistant', type: 'loading', content: '' }]);
+
+                // Simulate API delay
+                await new Promise(resolve => setTimeout(resolve, 1500));
+
+                // Generate mock workflow response
+                const mockResponse = generateMockWorkflow(query);
+
+                setMessages(prev => {
+                    const newArr = [...prev];
+                    newArr[newArr.length - 1] = {
+                        role: 'assistant',
+                        type: mockResponse.type,
+                        content: mockResponse.content,
+                        context: mockResponse.context
+                    };
+                    return newArr;
+                });
+
+                setIsSearching(false);
+                return;
+            }
+
             // Use new agent endpoint
             const response = await fetch('http://localhost:8000/api/agent/chat', {
                 method: 'POST',
@@ -155,8 +185,9 @@ function ChatPage() {
             <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6">
                 <div className="w-full">
                     {messages.map((msg, idx) => (
-                        <ChatMessage key={idx} message={msg} />
+                        <ChatMessage key={idx} message={msg} onSearch={handleSearch} />
                     ))}
+                    <div className="h-32" /> {/* Spacer for scrolling */}
                     <div ref={messagesEndRef} />
                 </div>
             </div>

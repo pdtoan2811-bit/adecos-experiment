@@ -30,6 +30,7 @@ const Sidebar = () => {
         { path: '/', label: 'AI Agent', icon: '🤖' },
         { path: '/projects', label: 'Dự án đã lưu', icon: '◫', badge: savedCount },
         { path: '/ads', label: 'Quản lý Ads', icon: '📢' },
+        { path: '/experiments', label: 'Experiments', icon: '🧪' },
         { path: '/dashboard', label: 'Analytics', icon: '▭' },
         { path: '/settings', label: 'Settings', icon: '⚙' },
     ];

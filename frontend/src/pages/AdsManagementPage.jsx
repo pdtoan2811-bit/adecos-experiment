@@ -77,24 +77,6 @@ const AdsManagementPage = () => {
                 </div>
             </div>
 
-            {/* Overview Cards (Only for Accounts Tab) */}
-            {activeTab === 'accounts' && (
-                <div className="grid grid-cols-3 gap-6 mb-8">
-                    <div className="bg-white/5 border border-white/10 p-5 rounded-lg">
-                        <div className="text-gray-400 text-xs uppercase tracking-wider mb-2">Tổng ngân sách đã nạp</div>
-                        <div className="text-2xl font-mono text-white">{formatCurrency(metrics.totalBudget)}</div>
-                    </div>
-                    <div className="bg-white/5 border border-white/10 p-5 rounded-lg">
-                        <div className="text-gray-400 text-xs uppercase tracking-wider mb-2">Tổng chi tiêu</div>
-                        <div className="text-2xl font-mono text-gray-300">{formatCurrency(metrics.totalSpent)}</div>
-                    </div>
-                    <div className="bg-white/5 border border-white/10 p-5 rounded-lg">
-                        <div className="text-gray-400 text-xs uppercase tracking-wider mb-2">Số dư còn lại</div>
-                        <div className="text-2xl font-mono text-emerald-400">{formatCurrency(metrics.remaining)}</div>
-                    </div>
-                </div>
-            )}
-
             {/* Main Tabs */}
             <div className="flex gap-8 border-b border-white/10 mb-6">
                 {[
@@ -117,6 +99,24 @@ const AdsManagementPage = () => {
                     </button>
                 ))}
             </div>
+
+            {/* Overview Cards (Only for Accounts Tab) */}
+            {activeTab === 'accounts' && (
+                <div className="grid grid-cols-3 gap-6 mb-8">
+                    <div className="bg-white/5 border border-white/10 p-5 rounded-lg">
+                        <div className="text-gray-400 text-xs uppercase tracking-wider mb-2">Tổng ngân sách đã nạp</div>
+                        <div className="text-2xl font-mono text-white">{formatCurrency(metrics.totalBudget)}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-5 rounded-lg">
+                        <div className="text-gray-400 text-xs uppercase tracking-wider mb-2">Tổng chi tiêu</div>
+                        <div className="text-2xl font-mono text-gray-300">{formatCurrency(metrics.totalSpent)}</div>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-5 rounded-lg">
+                        <div className="text-gray-400 text-xs uppercase tracking-wider mb-2">Số dư còn lại</div>
+                        <div className="text-2xl font-mono text-emerald-400">{formatCurrency(metrics.remaining)}</div>
+                    </div>
+                </div>
+            )}
 
             {/* Sub Tabs (Platform) for Accounts */}
             {activeTab === 'accounts' && (

@@ -105,11 +105,12 @@ def classify_intent(query: str, conversation_history: str = "") -> dict:
 
 Phân loại câu hỏi của người dùng vào MỘT trong các loại sau:
 
-1. **data_analysis** - Người dùng muốn xem dữ liệu, biểu đồ, metrics về quảng cáo
+1. **data_analysis** - Người dùng muốn xem dữ liệu, biểu đồ, metrics về quảng cáo. BAO GỒM CẢ PHÂN TÍCH THEO GROUP.
    Ví dụ: "Chi phí tháng 11", "Hiển thị clicks tuần này", "ROAS của tôi thế nào?", "CPC", "Cost per click"
+   Ví dụ Grouping: "Chi phí theo tài khoản", "Doanh thu theo chiến dịch", "Hiệu quả từng account" -> Intent này.
    
-2. **data_query** - Người dùng muốn danh sách, bảng dữ liệu cụ thể về campaigns/accounts
-   Ví dụ: "Liệt kê các chiến dịch", "Campaigns nào có CPC cao nhất?", "Tài khoản nào đang active?"
+2. **data_query** - Người dùng muốn danh sách, bảng dữ liệu cụ thể về campaigns/accounts (CHỈ LIST/TABLE)
+   Ví dụ: "Liệt kê các chiến dịch", "Tài khoản nào đang active?", "Danh sách tài khoản"
 
 3. **comparison** - Người dùng muốn so sánh dữ liệu giữa các khoảng thời gian hoặc đối tượng
    Ví dụ: "So sánh tháng 10 và 11", "Campaign nào tốt hơn?", "Tuần này vs tuần trước"
@@ -128,7 +129,20 @@ Câu hỏi: "{query}"
 Lịch sử hội thoại: {conversation_history if conversation_history else "Chưa có"}
 
 Trả lời CHÍNH XÁC theo format JSON:
-{{"intent": "<loại>", "entities": {{"time_range": "<khoảng thời gian nếu có>", "metrics": ["<metrics được nhắc đến>"], "campaigns": ["<campaigns nếu có>"], "niche": "<ngách/lĩnh vực nếu có>"}}}}
+{{
+    "intent": "<loại>", 
+    "entities": {{
+        "time_range": "<khoảng thời gian nếu có>", 
+        "metrics": ["<metrics được nhắc đến>"], 
+        "campaigns": ["<campaigns nếu có>"], 
+        "niche": "<ngách/lĩnh vực nếu có>",
+        "program": "<tên chương trình affiliate nếu có, v.d. Shopee, Binance>",
+        "keywords": ["<từ khóa cần lọc nều có, v.d. crypto, forex>"],
+        "group_by": "<account|campaign|day|week|month>",
+        "breakdown": "<account|campaign|none>",
+        "visual_type": "<line|bar|area|none>"
+    }}
+}}
 """
     
     model = genai.GenerativeModel("gemini-3-flash-preview")
@@ -161,16 +175,33 @@ async def execute_data_analysis_crew(query: str, entities: dict) -> dict:
     query_tool = QueryAdsCampaignsTool()
     calc_tool = CalculateMetricsTool()
     
-    time_range = entities.get("time_range", "last 30 days")
-    logger.info(f"📅 Time range: {time_range}")
+    time_range = entities.get("time_range") or "last 30 days"
+    breakdown = entities.get("breakdown")
+    visual_type = entities.get("visual_type") # Explicit user request: line, bar, etc.
+    
+    logger.info(f"📅 Time range: {time_range} | Breakdown: {breakdown} | Visual: {visual_type}")
     
     # Get campaign data
-    data_result = query_tool._run(json.dumps({
+    query_params = {
         "date_range": time_range,
-        "group_by": "day"
-    }))
+        "group_by": entities.get("group_by", "day")
+    }
+    
+    # If granular breakdown requested (e.g. "compare accounts over time")
+    if breakdown in ["account", "campaign"] and "theo" in query.lower() and ("ngày" in query.lower() or "tháng" in query.lower() or "over time" in query.lower() or "biểu đồ" in query.lower()):
+        query_params["breakdown"] = breakdown
+    
+    # Add optional filters
+    if entities.get("program"):
+        query_params["program"] = entities["program"]
+    if entities.get("keywords"):
+        query_params["keywords"] = entities["keywords"]
+    
+    data_result = query_tool._run(json.dumps(query_params))
     data_parsed = json.loads(data_result)
-    logger.debug(f"   Data points retrieved: {len(data_parsed['data'])}")
+    
+    is_granular = data_parsed.get("is_granular", False)
+    logger.debug(f"   Data points retrieved: {len(data_parsed['data'])} | Granular: {is_granular}")
     
     # Calculate metrics
     metrics_result = calc_tool._run(json.dumps({
@@ -180,81 +211,108 @@ async def execute_data_analysis_crew(query: str, entities: dict) -> dict:
     metrics_parsed = json.loads(metrics_result)
     
     # Step 2: Generate narrative
-    narrative_prompt = f"""Bạn là một chuyên gia phân tích quảng cáo thân thiện.
+    narrative_prompt = f"""Bạn là một chuyên gia phân tích quảng cáo.
+Người dùng đang hỏi: "{query}"
 
-Dựa trên dữ liệu sau, viết một đoạn giới thiệu ngắn gọn (2-3 câu) bằng tiếng Việt:
+Dữ liệu tổng hợp ({time_range}):
+- Clicks: {data_parsed['summary']['totalClicks']:,}
+- Cost: {data_parsed['summary']['totalCost']:,.0f}
+- Revenue: {data_parsed['summary']['totalRevenue']:,.0f}
+- CPC: {metrics_parsed['metrics'].get('cpc', 0):,.0f}
+- ROAS: {metrics_parsed['metrics'].get('roas', 0):.2f}
+- CTR: {metrics_parsed['metrics'].get('ctr', 0):.2f}%
 
-Thời gian: {time_range}
-Tổng clicks: {data_parsed['summary']['totalClicks']:,}
-Tổng chi phí: {data_parsed['summary']['totalCost']:,.0f} VND
-Tổng doanh thu: {data_parsed['summary']['totalRevenue']:,.0f} VND
-CPC trung bình: {metrics_parsed['metrics'].get('cpc', 0):,.0f} VND
-ROAS: {metrics_parsed['metrics'].get('roas', 0):.2f}
-
-Yêu cầu:
-- Thân thiện nhưng chuyên nghiệp
-- Highlight điểm quan trọng nhất
-- Kết thúc bằng câu dẫn vào biểu đồ
-
-Chỉ trả về đoạn văn, không có format markdown phức tạp."""
+Yêu cầu logic:
+1. Đọc kỹ câu hỏi người dùng để biết họ quan tâm chỉ số nào.
+2. Viết nhận định tập trung vào câu hỏi đó. 
+3. Nếu là so sánh (breakdown), hãy nhận xét xu hướng của các entities.
+4. Ngắn gọn (2-3 câu). Tiếng Việt.
+"""
 
     model = genai.GenerativeModel("gemini-3-flash-preview")
     narrative_response = model.generate_content(narrative_prompt)
     narrative = narrative_response.text.strip()
     
-    # Determine chart type and series based on query
-    query_lower = query.lower()
-    
-    # Build dynamic series based on what user is asking about
+    # Step 3: Prepare Visualization Data
+    chart_data = data_parsed["data"]
     series = []
     chart_title = "Hiệu suất quảng cáo"
-    chart_type = "area"  # Default
+    chart_type = visual_type if visual_type in ["line", "bar", "area"] else "area" # Use user pref or default
+    x_axis_key = "date"
     
-    # Check for specific metrics mentioned
-    if "cpc" in query_lower or "cost per click" in query_lower:
-        series.append({"dataKey": "cpc", "name": "CPC", "color": "#3b82f6"})
-        chart_title = "Chi phí mỗi click (CPC)"
-        chart_type = "line"
-    if "roas" in query_lower:
-        series.append({"dataKey": "roas", "name": "ROAS", "color": "#8b5cf6"})
-        chart_title = "ROAS - Return on Ad Spend"
-        chart_type = "line"
-    if "ctr" in query_lower:
-        series.append({"dataKey": "ctr", "name": "CTR %", "color": "#06b6d4"})
-        chart_title = "Click-Through Rate (CTR)"
-        chart_type = "line"
-    if "click" in query_lower or "lượt" in query_lower:
-        series.append({"dataKey": "clicks", "name": "Clicks", "color": "#3b82f6"})
-        chart_title = "Lượt click"
-        chart_type = "line"
-    if "impression" in query_lower or "hiển thị" in query_lower:
-        series.append({"dataKey": "impressions", "name": "Impressions", "color": "#8b5cf6"})
-        chart_title = "Lượt hiển thị"
-        chart_type = "area"
-    if "chi phí" in query_lower or "cost" in query_lower:
-        series.append({"dataKey": "cost", "name": "Chi phí", "color": "#ef4444"})
-        if "chi phí" in query_lower:
-            chart_title = "Chi phí quảng cáo"
-    if "doanh thu" in query_lower or "revenue" in query_lower:
-        series.append({"dataKey": "revenue", "name": "Doanh thu", "color": "#22c55e"})
-        if "doanh thu" in query_lower:
-            chart_title = "Doanh thu từ quảng cáo"
-    if "conversion" in query_lower or "chuyển đổi" in query_lower:
-        series.append({"dataKey": "conversions", "name": "Chuyển đổi", "color": "#f59e0b"})
-        chart_title = "Lượt chuyển đổi"
-        chart_type = "bar"
+    # COLOR PALETTE for multi-series
+    colors = ["#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6", "#06b6d4", "#ec4899", "#6366f1"]
     
-    # Default: show cost and revenue if nothing specific mentioned
-    if not series:
-        series = [
-            {"dataKey": "cost", "name": "Chi phí", "color": "#ef4444"},
-            {"dataKey": "revenue", "name": "Doanh thu", "color": "#22c55e"}
-        ]
-        chart_title = "Chi phí và Doanh thu"
-    
-    # Log the selected series
-    series_names = [s["dataKey"] for s in series]
-    logger.info(f"📈 CHART TYPE: {chart_type} | SERIES: {series_names} | TITLE: {chart_title}")
+    # Logic for Multi-Series Chart (Pivoting)
+    if is_granular:
+        # Pivot logic: Transform [{date, entity, cost}, ...] -> [{date, entity1_cost, entity2_cost}, ...]
+        pivoted = {}
+        entities_found = set()
+        
+        # Determine metric to plot
+        metric_key = "cost" # Default
+        if "doanh thu" in query.lower() or "revenue" in query.lower(): metric_key = "revenue"
+        elif "click" in query.lower(): metric_key = "clicks"
+        elif "cpc" in query.lower(): metric_key = "cpc"
+        elif "roas" in query.lower(): metric_key = "roas"
+        
+        chart_title = f"{metric_key.upper()} theo {breakdown} ({time_range})"
+        if not visual_type: chart_type = "line" # Default to line for comparison over time
+        
+        for record in data_parsed["data"]:
+            d_key = record["date"]
+            ent = record["entity"]
+            entities_found.add(ent)
+            
+            if d_key not in pivoted:
+                pivoted[d_key] = {"date": d_key}
+            
+            pivoted[d_key][ent] = record[metric_key]
+            
+        chart_data = sorted(list(pivoted.values()), key=lambda x: x["date"])
+        
+        # Generate series for each entity
+        for idx, ent in enumerate(sorted(entities_found)):
+            color = colors[idx % len(colors)]
+            series.append({
+                "dataKey": ent,
+                "name": ent,
+                "color": color
+            })
+            
+    else:
+        # Standard Single Series Logic (Bar/Line/Area for total metrics)
+        query_lower = query.lower()
+        
+        # Check for specific metrics mentioned
+        if "cpc" in query_lower:
+            if not visual_type: chart_type = "line"
+            if not series: series.append({"dataKey": "cpc", "name": "CPC", "color": "#3b82f6"})
+        if "roas" in query_lower:
+             if not visual_type: chart_type = "line"
+             if not series: series.append({"dataKey": "roas", "name": "ROAS", "color": "#8b5cf6"})
+        if "ctr" in query_lower:
+            if not visual_type: chart_type = "line"
+            if not series: series.append({"dataKey": "ctr", "name": "CTR %", "color": "#06b6d4"})
+        if "click" in query_lower:
+            if not visual_type: chart_type = "line"
+            if not series: series.append({"dataKey": "clicks", "name": "Clicks", "color": "#3b82f6"})
+        if "impression" in query_lower:
+             if not visual_type: chart_type = "area"
+             if not series: series.append({"dataKey": "impressions", "name": "Impressions", "color": "#8b5cf6"})
+        if "conversions" in query_lower:
+             chart_type = "bar"
+             if not series: series.append({"dataKey": "conversions", "name": "Chuyển đổi", "color": "#f59e0b"})
+        
+        # Fallback if no specific metric found
+        if not series:
+             series = [
+                {"dataKey": "cost", "name": "Chi phí", "color": "#ef4444"},
+                {"dataKey": "revenue", "name": "Doanh thu", "color": "#22c55e"}
+            ]
+             if not visual_type: chart_type = "area"
+
+    logger.info(f"📈 CHART: {chart_type} | SERIES: {len(series)} | DATA: {len(chart_data)}")
     
     return {
         "type": "composite",
@@ -268,10 +326,10 @@ Chỉ trả về đoạn văn, không có format markdown phức tạp."""
                     "type": "chart",
                     "content": {
                         "chartType": chart_type,
-                        "title": f"{chart_title} - {time_range}",
-                        "data": data_parsed["data"],
+                        "title": f"{chart_title}",
+                        "data": chart_data,
                         "config": {
-                            "xAxis": "date",
+                            "xAxis": x_axis_key,
                             "series": series
                         }
                     }
@@ -280,7 +338,12 @@ Chỉ trả về đoạn văn, không có format markdown phức tạp."""
             "summary": metrics_parsed
         },
         "context": {
-            "filters": {"timeRange": time_range},
+            "filters": {
+                "timeRange": time_range,
+                "dateRange": data_parsed.get("dateRange"), # Pass structured start/end dates
+                "program": entities.get("program"),
+                "keywords": entities.get("keywords")
+            },
             "followupSuggestions": [
                 "So sánh với tháng trước",
                 "Phân tích theo chiến dịch", 
@@ -327,10 +390,29 @@ async def execute_data_query_crew(query: str, entities: dict) -> dict:
     
     if "campaign" in query_lower or "chiến dịch" in query_lower:
         tool = QueryCampaignListTool()
-        result = tool._run("{}")
+        
+        # Build query with filters
+        params = {}
+        if entities.get("program"):
+            params["program"] = entities["program"]
+        if entities.get("keywords"):
+             kws = entities["keywords"]
+             if isinstance(kws, list) and kws:
+                 params["keyword"] = kws[0]
+             elif isinstance(kws, str):
+                 params["keyword"] = kws
+        
+        result = tool._run(json.dumps(params))
         data = json.loads(result)
         table_data = data["campaigns"]
-        narrative = f"Đây là danh sách {len(table_data)} chiến dịch hiện có trong hệ thống của bạn:"
+        
+        filter_desc = ""
+        if params.get("program"):
+            filter_desc += f" cho {params['program']}"
+        if params.get("keyword"):
+            filter_desc += f" với từ khóa '{params['keyword']}'"
+            
+        narrative = f"Dưới đây là danh sách {len(table_data)} chiến dịch{filter_desc}:"
     elif "account" in query_lower or "tài khoản" in query_lower:
         tool = QueryAccountsTool()
         result = tool._run("")
@@ -338,9 +420,20 @@ async def execute_data_query_crew(query: str, entities: dict) -> dict:
         table_data = data["accounts"]
         narrative = f"Bạn đang có {data['activeAccounts']} tài khoản đang hoạt động trong tổng số {data['totalAccounts']} tài khoản:"
     else:
-        # Default to campaigns
+        # Default to campaigns with filters if any
         tool = QueryCampaignListTool()
-        result = tool._run("{}")
+        
+        params = {}
+        if entities.get("program"):
+            params["program"] = entities["program"]
+        if entities.get("keywords"):
+             kws = entities["keywords"]
+             if isinstance(kws, list) and kws:
+                 params["keyword"] = kws[0]
+             elif isinstance(kws, str):
+                 params["keyword"] = kws
+                 
+        result = tool._run(json.dumps(params))
         data = json.loads(result)
         table_data = data["campaigns"]
         narrative = f"Đây là dữ liệu bạn yêu cầu:"

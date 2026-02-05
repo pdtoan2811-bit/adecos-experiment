@@ -1,327 +1,181 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 
 const AddAccountModal = ({ isOpen, onClose, onAdd, onImport }) => {
-    const [mode, setMode] = useState('single'); // single | import
-    const [formData, setFormData] = useState({
-        name: '',
-        id: '',
-        platform: 'google',
-        source: 'Via',
-        budgetLoaded: '',
-        digitalStaff: 'Thomas',
-        notes: ''
-    });
-
-    // Import State
-    const [importFile, setImportFile] = useState(null);
-    const [preview, setPreview] = useState([]);
-    const [error, setError] = useState(null);
-    const fileInputRef = useRef(null);
+    const [email, setEmail] = useState('');
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncResult, setSyncResult] = useState(null); // null | [] of accounts
+    const [step, setStep] = useState('input'); // input | syncing | result
 
     if (!isOpen) return null;
 
-    // --- Single Account Logic ---
-    const handleSingleSubmit = (e) => {
+    const resetState = () => {
+        setEmail('');
+        setIsSyncing(false);
+        setSyncResult(null);
+        setStep('input');
+    };
+
+    const handleClose = () => {
+        onClose();
+        setTimeout(resetState, 300); // Reset after animation if any, or just plain reset
+    };
+
+    const handleSync = (e) => {
         e.preventDefault();
-        const newAccount = {
-            ...formData,
-            id: formData.id || `ACC-${Date.now()}`,
-            budgetLoaded: Number(formData.budgetLoaded) || 0,
-            budgetSpent: 0,
-            budgetRemaining: Number(formData.budgetLoaded) || 0,
-            dateAdded: new Date().toISOString().split('T')[0],
-            status: 'Active'
-        };
-        onAdd(newAccount);
-        onClose();
-        resetForm();
-    };
+        if (!email) return;
 
-    const resetForm = () => {
-        setFormData({
-            name: '',
-            id: '',
-            platform: 'google',
-            source: 'Via',
-            budgetLoaded: '',
-            digitalStaff: 'Thomas',
-            notes: ''
-        });
-        setImportFile(null);
-        setPreview([]);
-        setError(null);
-    };
+        setStep('syncing');
+        setIsSyncing(true);
 
-    // --- Import Logic ---
-    const handleDownloadTemplate = () => {
-        const headers = ["Name", "ID", "Platform", "Source", "Budget", "Staff", "Notes"];
-        const rows = [
-            ["Exness Search Campaign", "EX-001", "google", "Via", "50000000", "Thomas", "TK chính"],
-            ["Binance Video", "BN-002", "tiktok", "Agency", "100000000", "Sarah", "Video hot"]
-        ];
-
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + headers.join(",") + "\n"
-            + rows.map(e => e.join(",")).join("\n");
-
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "template_import_ads.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    };
-
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        setImportFile(file);
-        setError(null);
-
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            const text = evt.target.result;
-            parseCSV(text);
-        };
-        reader.onerror = () => setError("Lỗi khi đọc file");
-        reader.readAsText(file);
-    };
-
-    const parseCSV = (text) => {
-        try {
-            const lines = text.trim().split('\n');
-            // Assuming first line is header, skip it if it contains "Name"
-            const startIndex = lines[0].toLowerCase().includes('name') ? 1 : 0;
-
-            const parsed = [];
-            for (let i = startIndex; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-
-                // Simple comma splitting, handling basic quotes is complex in regex but for simple CSV:
-                const columns = line.split(',').map(c => c.trim());
-                if (columns.length < 3) continue; // Basic validation
-
-                // Mapping: Name, ID, Platform, Source, Budget, Staff, Notes
-                parsed.push({
-                    name: columns[0] || 'No Name',
-                    id: columns[1] || `IMP-${Date.now()}-${i}`,
-                    platform: (columns[2] || 'google').toLowerCase(),
-                    source: columns[3] || 'Via',
-                    budgetLoaded: parseInt(columns[4] || '0'),
-                    digitalStaff: columns[5] || 'Admin',
-                    notes: columns[6] || '',
-                    status: 'Pending',
-                    budgetSpent: 0,
-                    budgetRemaining: parseInt(columns[4] || '0'),
+        // Simulate API Call
+        setTimeout(() => {
+            const mockAccounts = [
+                {
+                    name: `TK Chạy Quảng Cáo - ${email.split('@')[0]}`,
+                    id: `ACC-${Date.now()}-1`,
+                    platform: 'google',
+                    source: 'Via',
+                    budgetLoaded: 50000000,
+                    budgetSpent: 12000000,
+                    budgetRemaining: 38000000,
+                    digitalStaff: email.split('@')[0],
+                    notes: 'Tài khoản synced từ email',
+                    status: 'Active',
                     dateAdded: new Date().toISOString().split('T')[0]
-                });
-            }
+                },
+                {
+                    name: `TK Tiktok - ${email.split('@')[0]}`,
+                    id: `ACC-${Date.now()}-2`,
+                    platform: 'tiktok',
+                    source: 'Agency',
+                    budgetLoaded: 100000000,
+                    budgetSpent: 0,
+                    budgetRemaining: 100000000,
+                    digitalStaff: email.split('@')[0],
+                    notes: 'Tài khoản synced từ email',
+                    status: 'Active',
+                    dateAdded: new Date().toISOString().split('T')[0]
+                },
+                {
+                    name: `Meta Ads - BM50`,
+                    id: `ACC-${Date.now()}-3`,
+                    platform: 'meta',
+                    source: 'BM50',
+                    budgetLoaded: 20000000,
+                    budgetSpent: 5000000,
+                    budgetRemaining: 15000000,
+                    digitalStaff: email.split('@')[0],
+                    notes: 'Tài khoản synced từ email',
+                    status: 'Pending',
+                    dateAdded: new Date().toISOString().split('T')[0]
+                }
+            ];
 
-            if (parsed.length === 0) {
-                setError("Không tìm thấy dữ liệu hợp lệ trong file.");
-            } else {
-                setPreview(parsed);
-            }
-        } catch (err) {
-            setError("Lỗi format CSV. Hãy dùng file mẫu.");
-        }
+            setSyncResult(mockAccounts);
+            setIsSyncing(false);
+            setStep('result');
+        }, 2000);
     };
 
-    const handleImportConfirm = () => {
-        onImport(preview);
-        onClose();
-        resetForm();
+    const handleConfirmImport = () => {
+        if (syncResult && syncResult.length > 0) {
+            onImport(syncResult); // Use onImport to add multiple
+        }
+        handleClose();
     };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-            <div className="w-[600px] bg-[#111] border border-white/10 rounded-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="w-[500px] bg-[#111] border border-white/10 rounded-lg shadow-2xl overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-white/10 flex justify-between items-center">
-                    <h3 className="text-lg font-serif text-white">Thêm tài khoản mới</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">&times;</button>
+                    <h3 className="text-lg font-serif text-white">Đồng bộ tài khoản Ads</h3>
+                    <button onClick={handleClose} className="text-gray-400 hover:text-white">&times;</button>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex border-b border-white/10">
-                    <button
-                        onClick={() => setMode('single')}
-                        className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'single' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                    >
-                        Thêm thủ công
-                    </button>
-                    <button
-                        onClick={() => setMode('import')}
-                        className={`flex-1 py-3 text-sm font-medium transition-colors ${mode === 'import' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                    >
-                        Import file (Excel/CSV)
-                    </button>
-                </div>
-
-                <div className="p-6 overflow-y-auto custom-scrollbar">
-                    {mode === 'single' ? (
-                        <form onSubmit={handleSingleSubmit} className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs text-gray-400 mb-1">Tên tài khoản <span className="text-red-500">*</span></label>
-                                    <input
-                                        required
-                                        type="text"
-                                        className="w-full bg-black border border-white/20 rounded p-2 text-sm focus:border-white text-white"
-                                        placeholder="Ví dụ: MDW_Exness_01"
-                                        value={formData.name}
-                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    />
+                <div className="p-8">
+                    {step === 'input' && (
+                        <form onSubmit={handleSync} className="flex flex-col gap-6">
+                            <div className="text-center">
+                                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                                    🔗
                                 </div>
-                                <div>
-                                    <label className="block text-xs text-gray-400 mb-1">ID Tài khoản (Tùy chọn)</label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-black border border-white/20 rounded p-2 text-sm focus:border-white text-white"
-                                        placeholder="Tự động tạo nếu để trống"
-                                        value={formData.id}
-                                        onChange={e => setFormData({ ...formData, id: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs text-gray-400 mb-1">Nền tảng</label>
-                                    <select
-                                        className="w-full bg-black border border-white/20 rounded p-2 text-sm focus:border-white text-white"
-                                        value={formData.platform}
-                                        onChange={e => setFormData({ ...formData, platform: e.target.value })}
-                                    >
-                                        <option value="google">Google Ads</option>
-                                        <option value="meta">Meta Ads</option>
-                                        <option value="tiktok">TikTok Ads</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-gray-400 mb-1">Nguồn tài khoản</label>
-                                    <select
-                                        className="w-full bg-black border border-white/20 rounded p-2 text-sm focus:border-white text-white"
-                                        value={formData.source}
-                                        onChange={e => setFormData({ ...formData, source: e.target.value })}
-                                    >
-                                        <option value="Via">Via</option>
-                                        <option value="Clone">Clone</option>
-                                        <option value="BM50">BM50</option>
-                                        <option value="BM2500">BM2500</option>
-                                        <option value="Agency">Agency</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs text-gray-400 mb-1">Ngân sách đã nạp (VND)</label>
-                                    <input
-                                        type="number"
-                                        className="w-full bg-black border border-white/20 rounded p-2 text-sm focus:border-white text-white"
-                                        placeholder="50000000"
-                                        value={formData.budgetLoaded}
-                                        onChange={e => setFormData({ ...formData, budgetLoaded: e.target.value })}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-gray-400 mb-1">Nhân sự phụ trách</label>
-                                    <input
-                                        type="text"
-                                        className="w-full bg-black border border-white/20 rounded p-2 text-sm focus:border-white text-white"
-                                        placeholder="Tên nhân viên"
-                                        value={formData.digitalStaff}
-                                        onChange={e => setFormData({ ...formData, digitalStaff: e.target.value })}
-                                    />
-                                </div>
+                                <p className="text-gray-300 text-sm">
+                                    Nhập email quản trị viên để đồng bộ tất cả tài khoản quảng cáo liên kết.
+                                </p>
                             </div>
 
                             <div>
-                                <label className="block text-xs text-gray-400 mb-1">Ghi chú</label>
-                                <textarea
-                                    className="w-full bg-black border border-white/20 rounded p-2 text-sm focus:border-white text-white h-20"
-                                    placeholder="Ghi chú thêm về tài khoản..."
-                                    value={formData.notes}
-                                    onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                                />
-                            </div>
-
-                            <div className="pt-4 flex justify-end gap-3">
-                                <button type="button" onClick={onClose} className="px-4 py-2 text-sm hover:text-white transition-colors text-gray-400">Hủy</button>
-                                <button type="submit" className="px-4 py-2 bg-white text-black text-sm font-medium rounded hover:bg-gray-200">
-                                    Thêm tài khoản
-                                </button>
-                            </div>
-                        </form>
-                    ) : (
-                        <div className="space-y-6">
-                            <div className="bg-white/5 border border-white/10 rounded p-4 text-center">
-                                <p className="text-sm text-gray-300 mb-2">Bạn chưa có file mẫu?</p>
-                                <button
-                                    onClick={handleDownloadTemplate}
-                                    className="text-blue-400 text-sm hover:underline flex items-center justify-center gap-1 mx-auto"
-                                >
-                                    <span>📥</span> Tải file mẫu (CSV)
-                                </button>
-                            </div>
-
-                            <div
-                                className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center hover:border-white/40 transition-colors cursor-pointer"
-                                onClick={() => fileInputRef.current.click()}
-                            >
+                                <label className="block text-xs text-gray-400 mb-2 font-medium uppercase tracking-wider">Email Quản Trị</label>
                                 <input
-                                    type="file"
-                                    accept=".csv,.txt"
-                                    ref={fileInputRef}
-                                    className="hidden"
-                                    onChange={handleFileChange}
+                                    type="email"
+                                    required
+                                    autoFocus
+                                    className="w-full bg-black border border-white/20 rounded p-3 text-white focus:border-white outline-none transition-colors placeholder:text-gray-600"
+                                    placeholder="admin@example.com"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                 />
-                                <div className="text-4xl mb-3 opacity-50">📂</div>
-                                <p className="text-white font-medium mb-1">
-                                    {importFile ? importFile.name : "Click để tải lên file CSV"}
-                                </p>
-                                <p className="text-xs text-gray-500">Hỗ trợ định dạng .csv</p>
                             </div>
 
-                            {error && <p className="text-red-400 text-sm text-center bg-red-400/10 p-2 rounded">{error}</p>}
+                            <button
+                                type="submit"
+                                className="w-full py-3 bg-white text-black font-bold rounded hover:bg-gray-200 transition-colors uppercase tracking-wide text-sm"
+                            >
+                                Bắt đầu đồng bộ
+                            </button>
+                        </form>
+                    )}
 
-                            {preview.length > 0 && (
-                                <div className="mt-4">
-                                    <p className="text-sm text-green-400 mb-2 font-medium">✨ Đã đọc được {preview.length} tài khoản:</p>
-                                    <div className="max-h-40 overflow-y-auto border border-white/10 rounded bg-black/50 overflow-hidden">
-                                        <table className="w-full text-left text-xs text-gray-400">
-                                            <thead className="bg-white/10 text-white font-medium">
-                                                <tr>
-                                                    <th className="p-2">Tên</th>
-                                                    <th className="p-2">ID</th>
-                                                    <th className="p-2 text-right">Ngân sách</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-white/5">
-                                                {preview.map((p, i) => (
-                                                    <tr key={i}>
-                                                        <td className="p-2 truncate max-w-[150px]">{p.name}</td>
-                                                        <td className="p-2 font-mono">{p.id}</td>
-                                                        <td className="p-2 text-right font-mono">{p.budgetLoaded.toLocaleString()}</td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                    {step === 'syncing' && (
+                        <div className="flex flex-col items-center justify-center py-8">
+                            <div className="w-12 h-12 border-4 border-white/10 border-t-white rounded-full animate-spin mb-4"></div>
+                            <p className="text-white font-medium">Đang tìm kiếm tài khoản...</p>
+                            <p className="text-gray-500 text-xs mt-2">Vui lòng đợi trong giây lát</p>
+                        </div>
+                    )}
+
+                    {step === 'result' && (
+                        <div className="flex flex-col h-full">
+                            <div className="text-center mb-6">
+                                <div className="w-12 h-12 bg-green-900/30 text-green-400 rounded-full flex items-center justify-center mx-auto mb-3 text-xl">
+                                    ✓
                                 </div>
-                            )}
+                                <h4 className="text-white font-medium">Đã tìm thấy {syncResult.length} tài khoản</h4>
+                                <p className="text-gray-500 text-xs mt-1">Email: {email}</p>
+                            </div>
 
-                            <div className="pt-4 flex justify-end gap-3 border-t border-white/10 mt-4">
-                                <button onClick={onClose} className="px-4 py-2 text-sm hover:text-white transition-colors text-gray-400">Hủy</button>
+                            <div className="bg-white/5 rounded border border-white/10 overflow-hidden mb-6 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                {syncResult.map((acc, idx) => (
+                                    <div key={idx} className="p-3 border-b border-white/5 last:border-0 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-2 h-2 rounded-full ${acc.platform === 'google' ? 'bg-blue-400' : acc.platform === 'tiktok' ? 'bg-black border border-white/20' : 'bg-blue-600'}`}></div>
+                                            <div>
+                                                <div className="text-sm text-white font-medium">{acc.name}</div>
+                                                <div className="text-xs text-gray-500">{acc.id}</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xs text-emerald-400 font-mono">
+                                                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(acc.budgetRemaining)}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500">Số dư</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex gap-3">
                                 <button
-                                    onClick={handleImportConfirm}
-                                    disabled={preview.length === 0}
-                                    className="px-4 py-2 bg-white text-black text-sm font-medium rounded hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={resetState}
+                                    className="flex-1 py-2 text-sm text-gray-400 hover:text-white transition-colors"
                                 >
-                                    Import {preview.length > 0 ? preview.length : ''} Tài khoản
+                                    Thử lại
+                                </button>
+                                <button
+                                    onClick={handleConfirmImport}
+                                    className="flex-[2] py-2 bg-white text-black text-sm font-bold rounded hover:bg-gray-200 transition-colors uppercase"
+                                >
+                                    Xác nhận thêm
                                 </button>
                             </div>
                         </div>
